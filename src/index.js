@@ -40,12 +40,13 @@ function objectToQuery(obj) {
 
 /**
  * Encapsulates logic for managing uploading tasks.
- * @param {Reference} reference
- * @param {Blob} blob
- * @param {Object} [metadata]
+ * @param {string} bucket The name of the bucket
+ * @param {string} name The full name of the object
+ * @param {Blob} blob A blob that will be the file
+ * @param {Object} [metadata] Custom metadata
  */
-class UploadTask {
-	constructor({ bucket, name, blob, metadata = {} }) {
+export class UploadTask {
+	constructor(bucket, name, blob, metadata = {}) {
 		// Trying to emulate a promise by extending one.
 		// Doing it "manually" because extending it by using the
 		// native class 'extend' is not polyfillable.
@@ -53,8 +54,8 @@ class UploadTask {
 			this._resolve = resolve;
 			this._reject = reject;
 		});
-		this.then = this.promise.then.bind(this._promise);
-		this.catch = this.promise.catch.bind(this._promise);
+		this.then = this._promise.then.bind(this._promise);
+		this.catch = this._promise.catch.bind(this._promise);
 
 		// Save all the needed info.
 		this.blob = blob;
@@ -66,11 +67,16 @@ class UploadTask {
 		this.baseURL = `${baseApiURL}b/${bucket}/o`;
 	}
 
+	/**
+	 * Starts the uploading task.
+	 */
 	async start() {
+		const { metadata, blob } = this;
 		// If the file is smaller than 5MB, use a simple(non-resumable) upload.
 		// https://cloud.google.com/storage/docs/json_api/v1/how-tos/upload
-		if (this.blob.size < 5000000) {
-			return this.simpleUpload();
+		if (blob.size < 5000000) {
+			this.simpleUpload();
+			return;
 		}
 
 		// Else perform a resumable upload.
@@ -81,15 +87,15 @@ class UploadTask {
 		// Request to start a resumable upload session,
 		// the response will contain headers with information
 		// on how to proceed on subsequent requests.
-		const resumableSessionHeaders = await fetch(this.baseURL + objectToQuery({ name }), {
+		const resumableSessionHeaders = await fetch(this.baseURL + objectToQuery({ name: metadata.name }), {
 			method: 'POST',
-			body: JSON.stringify(this.metadata),
+			body: JSON.stringify(metadata),
 			headers: {
 				'Content-Type': 'application/json; charset=utf-8',
 				'X-Goog-Upload-Protocol': 'resumable',
 				'X-Goog-Upload-Command': 'start',
-				'X-Goog-Upload-Header-Content-Length': this.blob.size,
-				'X-Goog-Upload-Header-Content-Type': this.blob.type
+				'X-Goog-Upload-Header-Content-Length': blob.size,
+				'X-Goog-Upload-Header-Content-Type': blob.type
 			}
 		})
 			.then(res => res.headers) // TODO: Check if the response was "ok".
@@ -98,10 +104,10 @@ class UploadTask {
 		// Save the info needed to resume the upload to the instance.
 		this.uploadURL = resumableSessionHeaders.get('x-goog-upload-url');
 		// TODO: what to do when no granularity was requested?
-		this.granularity = resumableSessionHeaders.get('x-goog-upload-chunk-granularity');
+		this.granularity = Number(resumableSessionHeaders.get('x-goog-upload-chunk-granularity'));
 		this.offset = 0;
 
-		return this.resumeUpload();
+		this.resumeUpload();
 	}
 
 	/**
@@ -109,24 +115,29 @@ class UploadTask {
 	 */
 	resumeUpload() {
 		const { uploadURL, granularity, offset, blob } = this;
-		const remainingBlob = blob.slice(offset, granularity);
-		const isLastRequest = remainingBlob.size < granularity;
+		const currentChunk = blob.slice(offset, offset + granularity);
+		const isLastChunk = currentChunk.size < granularity;
 		const request = new Request(uploadURL, {
 			method: 'POST',
 			headers: {
 				'X-Goog-Upload-Offset': offset,
-				'X-Goog-Upload-Command': isLastRequest ? 'upload, finalize' : 'upload'
+				'X-Goog-Upload-Command': isLastChunk ? 'upload, finalize' : 'upload'
 			},
-			body: remainingBlob
+			body: currentChunk
 		});
 
-		return fetch(request)
-			.then(response => {
-				if (response.headers.get('x-goog-upload-status') === 'final') {
-					this._resolve(response.json());
+		fetch(request)
+			.then(async response => {
+				if (!response.ok) {
+					throw await response.text();
 				}
 
-				this.offset += granularity;
+				if (response.headers.get('x-goog-upload-status') === 'final') {
+					this._resolve(response.json());
+					return;
+				}
+
+				this.offset += currentChunk.size;
 				this.resumeUpload();
 			})
 			.catch(this._reject);
@@ -137,6 +148,7 @@ class UploadTask {
 	 * will be done, this function handles that.
 	 */
 	async simpleUpload() {
+		const { baseURL, metadata, blob } = this;
 		/*
 		 * As a work around for manually building a multipart
 		 * request, I use the FormData object. However, it still
@@ -155,12 +167,12 @@ class UploadTask {
 		 * And lastly we try to overwrite the request headers to "multipart/related."
 		 */
 		const formData = new FormData();
-		const metadata = new Blob([JSON.stringify(this.metadata)], { type: 'application/json; charset=UTF-8' });
+		const metadataBlob = new Blob([JSON.stringify(metadata)], { type: 'application/json; charset=UTF-8' });
 
-		formData.append('', metadata);
-		formData.append('', this.blob);
+		formData.append('', metadataBlob);
+		formData.append('', blob);
 
-		const request = new Request(`${this.baseURL}${encodeURIComponent(this.metadata.name)}`, {
+		const request = new Request(baseURL + objectToQuery({ name: metadata.name }), {
 			method: 'POST',
 			body: formData
 		});
@@ -169,7 +181,13 @@ class UploadTask {
 		request.headers.set('X-Goog-Upload-Protocol', 'multipart');
 
 		return fetch(request)
-			.then(this._resolve)
+			.then(async response => {
+				if (!response.ok) {
+					throw await response.text();
+				}
+
+				this._resolve(await response.json());
+			})
 			.catch(this._reject);
 	}
 }
@@ -178,7 +196,7 @@ class UploadTask {
  * Encapsulates logic for handling objects in cloud storage for firebase.
  * @param {string} path A http or gs path to an object or a directory.
  */
-class Reference {
+export class Reference {
 	constructor(path) {
 		// If the path is the name of a firebase default bucket.
 		// All firebase default buckets end with '.appspot.com'.
@@ -200,6 +218,7 @@ class Reference {
 
 	/**
 	 * Returns true if the reference is the root of the bucket.
+	 * @returns {boolean}
 	 */
 	get isRoot() {
 		return this.objectPath === '' || this.objectPath === undefined;
@@ -207,6 +226,7 @@ class Reference {
 
 	/**
 	 * Returns a "gs://" formatted path.
+	 * @returns {string}
 	 */
 	get gsPath() {
 		return `gs://${this.bucket}/${this.objectPath}`;
@@ -215,6 +235,7 @@ class Reference {
 	/**
 	 * Returns reference instance for the parent folder
 	 * of this instance's reference.
+	 * @returns {Reference} A reference to the parent folder of this reference.
 	 */
 	get parent() {
 		return new Reference(this.gsPath.replace(/([^/]+)\/?$/, ''));
@@ -223,6 +244,7 @@ class Reference {
 	/**
 	 * Returns a reference instance for the
 	 * root of the bucket.
+	 * @returns {Reference} Reference to the root location of the bucket.
 	 */
 	get root() {
 		if (this.isRoot) return this;
@@ -232,6 +254,7 @@ class Reference {
 	/**
 	 * Get the segments representing the object
 	 * for use by the API in the http request.
+	 * @returns {string} Segment used to create internal URL to the API.
 	 */
 	get URIPath() {
 		return `/b/${this.bucket}/o/${encodeURIComponent(this.objectPath)}`;
@@ -240,6 +263,8 @@ class Reference {
 	/**
 	 * Returns a new reference for a child of this
 	 * reference with the new path.
+	 * @param {string} path Path relative to the current reference.
+	 * @returns {Reference} A new reference pointing to the child.
 	 */
 	child(path) {
 		const childPath = this.gsPath.replace(/\/?$/, path);
@@ -247,21 +272,24 @@ class Reference {
 	}
 
 	/**
-	 * Uploads a blob or a string.
+	 * Uploads a blob to the referenced location.
+	 * @param {Blob} blob The file to upload
+	 * @param {Object} metadata Custom metadata for the file
+	 * @returns {Promise} A promise that resolves to the full object metadata.
 	 */
 	put(blob, metadata) {
-		return new UploadTask(this, blob, metadata);
+		return new UploadTask(this.bucket, this.objectPath, blob, metadata);
 	}
 
 	/**
-	 * Deletes the object.
+	 * Deletes the referenced object.
 	 */
 	delete() {
 		return fetch(baseApiURL + this.URIPath, { method: 'DELETE' });
 	}
 
 	/**
-	 * Lists objects in this reference.
+	 * Lists objects prefixed with this reference's name.
 	 */
 	list() {
 		const query = objectToQuery({ prefix: this.objectPath, delimiter: '/' });
@@ -270,6 +298,7 @@ class Reference {
 
 	/**
 	 * Returns the metadata for the object.
+	 * @returns {Object} the raw metadata of the referenced object.
 	 */
 	getMetadata() {
 		return fetch(baseApiURL + this.URIPath);
@@ -277,6 +306,8 @@ class Reference {
 
 	/**
 	 * Updates the metadata of an object.
+	 * Provided props will be overwritten, the rest will remain untouched.
+	 * @returns {Object} Updated metadata for this reference.
 	 */
 	updateMetadata(newMetadata) {
 		return fetch(baseApiURL + this.URIPath, {
@@ -287,6 +318,7 @@ class Reference {
 
 	/**
 	 * Returns a download link.
+	 * @returns {string} URL that can be used to download the reference.
 	 */
 	async getDownloadURL() {
 		const data = await this.getMetadata();
