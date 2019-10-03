@@ -27,7 +27,7 @@ const baseApiURL = 'https://firebasestorage.googleapis.com/v0/';
  * @param {Object} obj
  * @returns {string}
  */
-function objectToQuery(obj) {
+export function objectToQuery(obj = {}) {
 	let propsArr = [];
 
 	for (let prop in obj) {
@@ -35,7 +35,7 @@ function objectToQuery(obj) {
 		propsArr.push(`${prop}=${encodeURIComponent(obj[prop])}`);
 	}
 
-	return `?${propsArr.join('&')}`;
+	return propsArr.length === 0 ? '' : `?${propsArr.join('&')}`;
 }
 
 /**
@@ -61,7 +61,7 @@ export class UploadTask {
 		this.blob = blob;
 		this.metadata = {
 			...metadata,
-			name,
+			name: name.replace(/^\//, ''),
 			contentType: blob.type
 		};
 		this.baseURL = `${baseApiURL}b/${bucket}/o`;

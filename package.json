@@ -1,14 +1,23 @@
 {
-	"name": "firebase-storage-lite",
-	"version": "0.0.1",
-	"description": "alternative firebase storage JS library",
-	"main": "src/index.js",
-	"author": "Samuel Elgozi <samu.elgozi@gmail.com>",
-	"license": "MIT",
-	"devDependencies": {
-		"babel-eslint": "^10.0.3",
-		"eslint": "^6.4.0",
-		"eslint-plugin-babel": "^5.3.0",
-		"eslint-plugin-jest": "^22.17.0"
-	}
+  "name": "firebase-storage-lite",
+  "version": "0.0.1",
+  "description": "alternative firebase storage JS library",
+  "main": "src/index.js",
+  "author": "Samuel Elgozi <samu.elgozi@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.6.2",
+    "@babel/preset-env": "^7.6.2",
+    "babel-eslint": "^10.0.3",
+    "core-js": "^3.2.1",
+    "eslint": "^6.4.0",
+    "eslint-plugin-babel": "^5.3.0",
+    "eslint-plugin-jest": "^22.17.0",
+    "jest": "^24.9.0",
+    "node-fetch": "^2.6.0",
+    "regenerator-runtime": "^0.13.3"
+  },
+  "scripts": {
+    "test": "jest"
+  }
 }

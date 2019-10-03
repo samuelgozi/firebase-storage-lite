@@ -86,3 +86,6 @@ typings/
 
 # DynamoDB Local files
 .dynamodb/
+
+# Firebase configuration used for testing
+firebaseConfig.js
