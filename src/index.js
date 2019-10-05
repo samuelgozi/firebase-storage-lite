@@ -70,16 +70,20 @@ export class UploadTask {
 	/**
 	 * Starts the uploading task.
 	 */
-	async start() {
-		const { metadata, blob } = this;
+	start() {
 		// If the file is smaller than 5MB, use a simple(non-resumable) upload.
 		// https://cloud.google.com/storage/docs/json_api/v1/how-tos/upload
-		if (blob.size < 5000000) {
+		if (this.blob.size < 5000000) {
 			this.simpleUpload();
 			return;
 		}
 
-		// Else perform a resumable upload.
+		// Else start a resumable upload
+		this.startResumableUpload();
+	}
+
+	async startResumableUpload() {
+		const { metadata, blob } = this;
 		// More info about resumable uploads can be found here:
 		// https://developers.google.com/android/over-the-air/v1/how-tos/create-package
 		// This has nothing to do with firebase, but it seems like its the same protocol.
