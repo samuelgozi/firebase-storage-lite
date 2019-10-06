@@ -15,7 +15,7 @@
  * https://tools.ietf.org/html/rfc3986#section-3.3
  */
 export const gsRegex = /gs:\/\/([\w-.]+)\/?(.+)?/i;
-export const httpRegex = /https?:\/\/firebasestorage\.googleapis\.com\/v\w+\/b\/([\w-.]+)\/o\/?([^?#]+)?/i;
+export const httpRegex = /https?:\/\/firebasestorage\.googleapis\.com\/v\w+\/b\/([\w-.]+)\/?(?:o\/?([^?#]+)?)?/i;
 export const baseApiURL = 'https://firebasestorage.googleapis.com/v0/';
 
 /**

@@ -9,7 +9,7 @@ import UploadTask from './UploadTask.js';
 
 /**
  * Encapsulates logic for handling objects in cloud storage for firebase.
- * @param {string} path A http or gs path to an object or a directory.
+ * @param {string} path Http, GS or a appspot.com path to a file or a bucket
  */
 export default class Reference {
 	constructor(path) {
@@ -53,6 +53,7 @@ export default class Reference {
 	 * @returns {Reference} A reference to the parent folder of this reference.
 	 */
 	get parent() {
+		if (this.isRoot) throw Error("Can't get parent of root");
 		return new Reference(this.gsPath.replace(/([^/]+)\/?$/, ''));
 	}
 
@@ -72,6 +73,7 @@ export default class Reference {
 	 * @returns {string} Segment used to create internal URL to the API.
 	 */
 	get URIPath() {
+		if (this.isRoot) throw Error("Can't get URI path for root");
 		return `/b/${this.bucket}/o/${encodeURIComponent(this.objectPath)}`;
 	}
 
@@ -82,6 +84,10 @@ export default class Reference {
 	 * @returns {Reference} A new reference pointing to the child.
 	 */
 	child(path) {
+		// If doesn't start with a forward slash, add one.
+		path = path.startsWith('/') ? path : '/' + path;
+		// Join the provided path to the current gsPath, but make
+		// sure there are no double forward slashes.
 		const childPath = this.gsPath.replace(/\/?$/, path);
 		return new Reference(childPath);
 	}
@@ -116,7 +122,7 @@ export default class Reference {
 	 * @returns {Object} the raw metadata of the referenced object.
 	 */
 	getMetadata() {
-		return fetch(baseApiURL + this.URIPath);
+		return fetch(baseApiURL + this.URIPath).then(res => res.json());
 	}
 
 	/**
