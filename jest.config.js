@@ -18,7 +18,7 @@ module.exports = {
 	// clearMocks: false,
 
 	// Indicates whether the coverage information should be collected while executing the test
-	// collectCoverage: false,
+	collectCoverage: true,
 
 	// An array of glob patterns indicating a set of files for which coverage information should be collected
 	// collectCoverageFrom: null,
@@ -27,9 +27,7 @@ module.exports = {
 	coverageDirectory: 'coverage',
 
 	// An array of regexp pattern strings used to skip coverage collection
-	// coveragePathIgnorePatterns: [
-	//   "/node_modules/"
-	// ],
+	coveragePathIgnorePatterns: ['/node_modules/', 'test'],
 
 	// A list of reporter names that Jest uses when writing coverage reports
 	// coverageReporters: [
@@ -147,9 +145,7 @@ module.exports = {
 	// ],
 
 	// An array of regexp pattern strings that are matched against all test paths, matched tests are skipped
-	// testPathIgnorePatterns: [
-	//   "/node_modules/"
-	// ],
+	// testPathIgnorePatterns: ['/node_modules/']
 
 	// The regexp pattern or array of patterns that Jest uses to detect test files
 	// testRegex: [],
