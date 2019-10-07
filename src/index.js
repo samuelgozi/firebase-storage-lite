@@ -4,7 +4,7 @@
  * A lot of  helpful info about it can be found here:
  * https://developers.google.com/android/over-the-air/v1/how-tos/create-package
  */
-import { gsRegex, httpRegex, baseApiURL, objectToQuery } from './utils.js';
+import { gsRegex, httpRegex, baseApiURL, objectToQuery, authorizedFetch } from './utils.js';
 import UploadTask from './UploadTask.js';
 
 /**
@@ -12,7 +12,7 @@ import UploadTask from './UploadTask.js';
  * @param {string} path Http, GS or a appspot.com path to a file or a bucket
  */
 export default class Reference {
-	constructor(path) {
+	constructor(path, auth) {
 		// If the path is the name of a firebase default bucket.
 		// All firebase default buckets end with '.appspot.com'.
 		if (path.endsWith('.appspot.com')) {
@@ -29,6 +29,10 @@ export default class Reference {
 		// Object names can contain characters that require encoding/decoding.
 		// but are encoded only when when passed in URIs.
 		this.objectPath = isGSPath ? objectPath || '' : decodeURIComponent(objectPath || '');
+		this.auth = auth;
+
+		// Helper that wraps native fetch and adds auth headers.
+		this.fetch = authorizedFetch;
 	}
 
 	/**
@@ -99,14 +103,14 @@ export default class Reference {
 	 * @returns {Promise} A promise that resolves to the full object metadata.
 	 */
 	put(blob, metadata) {
-		return new UploadTask(this.bucket, this.objectPath, blob, metadata);
+		return new UploadTask({ bucket: this.bucket, name: this.objectPath, blob, metadata, auth: this.auth });
 	}
 
 	/**
 	 * Deletes the referenced object.
 	 */
 	delete() {
-		return fetch(baseApiURL + this.URIPath, { method: 'DELETE' });
+		return this.fetch(baseApiURL + this.URIPath, { method: 'DELETE' });
 	}
 
 	/**
@@ -114,7 +118,7 @@ export default class Reference {
 	 */
 	list() {
 		const query = objectToQuery({ prefix: this.objectPath, delimiter: '/' });
-		return fetch(`${baseApiURL}b/${this.bucket}/o${query}`);
+		return this.fetch(`${baseApiURL}b/${this.bucket}/o${query}`);
 	}
 
 	/**
@@ -122,7 +126,7 @@ export default class Reference {
 	 * @returns {Object} the raw metadata of the referenced object.
 	 */
 	getMetadata() {
-		return fetch(baseApiURL + this.URIPath).then(res => res.json());
+		return this.fetch(baseApiURL + this.URIPath).then(res => res.json());
 	}
 
 	/**
@@ -131,7 +135,7 @@ export default class Reference {
 	 * @returns {Object} Updated metadata for this reference.
 	 */
 	updateMetadata(newMetadata) {
-		return fetch(baseApiURL + this.URIPath, {
+		return this.fetch(baseApiURL + this.URIPath, {
 			method: 'PATCH',
 			body: JSON.stringify(newMetadata)
 		});

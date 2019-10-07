@@ -1,14 +1,16 @@
-import { baseApiURL, objectToQuery } from './utils.js';
+import { baseApiURL, objectToQuery, authorizedFetch } from './utils.js';
 
 /**
  * Encapsulates logic for managing uploading tasks.
- * @param {string} bucket The name of the bucket
- * @param {string} name The full name of the object
- * @param {Blob} blob A blob that will be the file
- * @param {Object} [metadata] Custom metadata
+ * @param {Object} options Options object
+ * @param {string} options.bucket The name of the bucket
+ * @param {string} options.name The full name of the object
+ * @param {Blob} options.blob A blob that will be the file
+ * @param {Object} [options.metadata] Custom metadata
+ * @param {Object} [auth] firebase-auth-lite instance
  */
 export default class UploadTask {
-	constructor(bucket, name, blob, metadata = {}) {
+	constructor({ bucket, name, blob, metadata = {}, auth }) {
 		this.blob = blob;
 		this.metadata = {
 			...metadata,
@@ -16,6 +18,10 @@ export default class UploadTask {
 			contentType: blob.type
 		};
 		this.baseURL = `${baseApiURL}b/${bucket}/o`;
+		this.auth = auth;
+
+		// Helper that wraps native fetch and adds auth headers.
+		this.fetch = authorizedFetch;
 	}
 
 	/**
@@ -43,7 +49,8 @@ export default class UploadTask {
 		// Request to start a resumable upload session,
 		// the response will contain headers with information
 		// on how to proceed on subsequent requests.
-		const resumableSessionHeaders = await fetch(this.baseURL + objectToQuery({ name: metadata.name }), {
+		// TODO: Check if the response was "ok".
+		const resumableSessionHeaders = await this.fetch(this.baseURL + objectToQuery({ name: metadata.name }), {
 			method: 'POST',
 			body: JSON.stringify(metadata),
 			headers: {
@@ -53,7 +60,7 @@ export default class UploadTask {
 				'X-Goog-Upload-Header-Content-Length': blob.size,
 				'X-Goog-Upload-Header-Content-Type': blob.type
 			}
-		}).then(res => res.headers); // TODO: Check if the response was "ok".
+		}).then(res => res.headers);
 
 		// Save the info needed to resume the upload to the instance.
 		this.uploadURL = resumableSessionHeaders.get('x-goog-upload-url');
@@ -80,7 +87,7 @@ export default class UploadTask {
 			body: currentChunk
 		});
 
-		return fetch(request).then(async response => {
+		return this.fetch(request).then(async response => {
 			if (!response.ok) {
 				throw await response.text();
 			}
@@ -131,7 +138,7 @@ export default class UploadTask {
 		request.headers.set('Content-Type', request.headers.get('Content-Type').replace('form-data', 'related'));
 		request.headers.set('X-Goog-Upload-Protocol', 'multipart');
 
-		return fetch(request).then(async response => {
+		return this.fetch(request).then(async response => {
 			if (!response.ok) {
 				throw await response.text();
 			}
