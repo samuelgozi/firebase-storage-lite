@@ -1,27 +1,21 @@
-import { baseApiURL, objectToQuery, authorizedFetch } from './utils.js';
+import { baseApiURL, objectToQuery } from './utils.js';
 
 /**
  * Encapsulates logic for managing uploading tasks.
  * @param {Object} options Options object
- * @param {string} options.bucket The name of the bucket
- * @param {string} options.name The full name of the object
- * @param {Blob} options.blob A blob that will be the file
- * @param {Object} [options.metadata] Custom metadata
- * @param {Object} [auth] firebase-auth-lite instance
+ * @param {Blob} blob A blob that will be the file
+ * @param {Object} [metadata] Custom metadata
  */
 export default class UploadTask {
-	constructor({ bucket, name, blob, metadata = {}, auth }) {
+	constructor(ref, blob, metadata = {}) {
+		this.ref = ref;
 		this.blob = blob;
 		this.metadata = {
 			...metadata,
-			name: name.replace(/^\//, ''),
+			name: ref.objectPath,
 			contentType: blob.type
 		};
-		this.baseURL = `${baseApiURL}b/${bucket}/o`;
-		this.auth = auth;
-
-		// Helper that wraps native fetch and adds auth headers.
-		this.fetch = authorizedFetch;
+		this.baseURL = `${baseApiURL}b/${ref.bucket}/o`;
 	}
 
 	/**
@@ -50,17 +44,19 @@ export default class UploadTask {
 		// the response will contain headers with information
 		// on how to proceed on subsequent requests.
 		// TODO: Check if the response was "ok".
-		const resumableSessionHeaders = await this.fetch(this.baseURL + objectToQuery({ name: metadata.name }), {
-			method: 'POST',
-			body: JSON.stringify(metadata),
-			headers: {
-				'Content-Type': 'application/json; charset=utf-8',
-				'X-Goog-Upload-Protocol': 'resumable',
-				'X-Goog-Upload-Command': 'start',
-				'X-Goog-Upload-Header-Content-Length': blob.size,
-				'X-Goog-Upload-Header-Content-Type': blob.type
-			}
-		}).then(res => res.headers);
+		const resumableSessionHeaders = await this.ref
+			.fetch(this.baseURL + objectToQuery({ name: metadata.name }), {
+				method: 'POST',
+				body: JSON.stringify(metadata),
+				headers: {
+					'Content-Type': 'application/json; charset=utf-8',
+					'X-Goog-Upload-Protocol': 'resumable',
+					'X-Goog-Upload-Command': 'start',
+					'X-Goog-Upload-Header-Content-Length': blob.size,
+					'X-Goog-Upload-Header-Content-Type': blob.type
+				}
+			})
+			.then(res => res.headers);
 
 		// Save the info needed to resume the upload to the instance.
 		this.uploadURL = resumableSessionHeaders.get('x-goog-upload-url');
@@ -87,11 +83,7 @@ export default class UploadTask {
 			body: currentChunk
 		});
 
-		return this.fetch(request).then(async response => {
-			if (!response.ok) {
-				throw await response.text();
-			}
-
+		return this.ref.fetch(request).then(async response => {
 			if (response.headers.get('x-goog-upload-status') === 'final') {
 				return await response.json();
 			}
@@ -138,12 +130,6 @@ export default class UploadTask {
 		request.headers.set('Content-Type', request.headers.get('Content-Type').replace('form-data', 'related'));
 		request.headers.set('X-Goog-Upload-Protocol', 'multipart');
 
-		return this.fetch(request).then(async response => {
-			if (!response.ok) {
-				throw await response.text();
-			}
-
-			return await response.json();
-		});
+		return this.ref.fetch(request).then(response => response.json());
 	}
 }

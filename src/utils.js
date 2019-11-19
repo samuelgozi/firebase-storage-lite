@@ -33,20 +33,3 @@ export function objectToQuery(obj = {}) {
 
 	return propsArr.length === 0 ? '' : `?${propsArr.join('&')}`;
 }
-
-/**
- * Uses native fetch, but adds authorization headers
- * if the Reference was instantiated with an auth instance.
- * The API is exactly the same as native fetch.
- * @param {Request|Object|string} resource the resource to send the request to, or an options object.
- * @param {Object} init an options object.
- */
-export function authorizedFetch(resource, init) {
-	const request = resource instanceof Request ? resource : new Request(resource, init);
-
-	if (this.auth && this.auth.authorizeRequest) {
-		this.auth.authorizeRequest(request);
-	}
-
-	return fetch(request);
-}

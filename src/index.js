@@ -4,7 +4,7 @@
  * A lot of  helpful info about it can be found here:
  * https://developers.google.com/android/over-the-air/v1/how-tos/create-package
  */
-import { gsRegex, httpRegex, baseApiURL, objectToQuery, authorizedFetch } from './utils.js';
+import { gsRegex, httpRegex, baseApiURL, objectToQuery } from './utils.js';
 import UploadTask from './UploadTask.js';
 
 /**
@@ -18,6 +18,7 @@ export default class Reference {
 		if (path.endsWith('.appspot.com')) {
 			this.bucket = path;
 			this.objectPath = '';
+			this.auth = auth;
 			return;
 		}
 
@@ -30,9 +31,42 @@ export default class Reference {
 		// but are encoded only when when passed in URIs.
 		this.objectPath = isGSPath ? objectPath || '' : decodeURIComponent(objectPath || '');
 		this.auth = auth;
+	}
 
-		// Helper that wraps native fetch and adds auth headers.
-		this.fetch = authorizedFetch;
+	/**
+	 * Uses native fetch, but adds authorization headers
+	 * if the Reference was instantiated with an auth instance.
+	 * The API is exactly the same as native fetch.
+	 * @param {Request|Object|string} resource the resource to send the request to, or an options object.
+	 * @param {Object} init an options object.
+	 */
+	fetch(resource, init) {
+		const request = resource instanceof Request ? resource : new Request(resource, init);
+		const shouldAuthorize = this.auth && 'authorizeRequest' in this.auth;
+
+		if (shouldAuthorize) {
+			this.auth.authorizeRequest(request);
+		}
+
+		return fetch(request.clone()).then(async response => {
+			if (!response.ok) {
+				const error = response.headers.get('content-type').includes('application/json')
+					? (await response.json()).error.message
+					: await response.text();
+
+				// If the request failed due to outdated auth credentials,
+				// and authentication was used to make the request, then try to
+				// refresh the credentials and then remake the request.
+				if (shouldAuthorize && error === 'Missing or invalid authentication.') {
+					await this.auth.refreshIdToken();
+					return this.fetch(request);
+				}
+
+				throw error;
+			}
+
+			return response;
+		});
 	}
 
 	/**
@@ -58,7 +92,7 @@ export default class Reference {
 	 */
 	get parent() {
 		if (this.isRoot) throw Error("Can't get parent of root");
-		return new Reference(this.gsPath.replace(/([^/]+)\/?$/, ''));
+		return new Reference(this.gsPath.replace(/([^/]+)\/?$/, ''), this.auth);
 	}
 
 	/**
@@ -68,7 +102,7 @@ export default class Reference {
 	 */
 	get root() {
 		if (this.isRoot) return this;
-		return new Reference(`gs://${this.bucket}/`);
+		return new Reference(`gs://${this.bucket}/`, this.auth);
 	}
 
 	/**
@@ -93,7 +127,7 @@ export default class Reference {
 		// Join the provided path to the current gsPath, but make
 		// sure there are no double forward slashes.
 		const childPath = this.gsPath.replace(/\/?$/, path);
-		return new Reference(childPath);
+		return new Reference(childPath, this.auth);
 	}
 
 	/**
@@ -103,7 +137,8 @@ export default class Reference {
 	 * @returns {Promise} A promise that resolves to the full object metadata.
 	 */
 	put(blob, metadata) {
-		return new UploadTask({ bucket: this.bucket, name: this.objectPath, blob, metadata, auth: this.auth });
+		console.log(this);
+		return new UploadTask(this, blob, metadata);
 	}
 
 	/**
