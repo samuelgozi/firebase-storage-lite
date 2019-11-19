@@ -137,7 +137,6 @@ export default class Reference {
 	 * @returns {Promise} A promise that resolves to the full object metadata.
 	 */
 	put(blob, metadata) {
-		console.log(this);
 		return new UploadTask(this, blob, metadata);
 	}
 
