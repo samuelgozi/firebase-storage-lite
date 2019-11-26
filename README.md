@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/samuelgozi/firebase-storage-lite/branch/master/graph/badge.svg)](https://codecov.io/gh/samuelgozi/firebase-storage-lite)
+
 # Firebase storage lite(WIP)
 
 The Official Firebase SDKs for Javascript are too big and can make it very hard for developers to achieve standard loading times, and if you are like me and strive to provide the best performance for you users, its impossible to provide good loading times for smartphones over 3G networks due to its big size and over complicated code.
@@ -23,7 +25,7 @@ Another thing to consider is that offline functionality is currently missing. I 
 Short answer: yes.
 But the full answer is, that it depends on you project.
 If you want to know more details, please read my post on the Firebase google group:
-https://groups.google.com/forum/#!topic/firebase-talk/F0NenvOEYrE
+https://groups.google.com/d/msg/firebase-talk/F0NenvOEYrE/tw3yaHvKBQAJ
 
 ## How to install and use.
 
