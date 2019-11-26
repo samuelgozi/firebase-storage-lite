@@ -112,7 +112,7 @@ export default class Reference {
 	 */
 	get URIPath() {
 		if (this.isRoot) throw Error("Can't get URI path for root");
-		return `/b/${this.bucket}/o/${encodeURIComponent(this.objectPath)}`;
+		return `b/${this.bucket}/o/${encodeURIComponent(this.objectPath)}`;
 	}
 
 	/**

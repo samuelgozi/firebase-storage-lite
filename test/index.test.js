@@ -185,7 +185,7 @@ describe('Reference', () => {
 		test('Path to object', () => {
 			const ref = new Reference('gs://sandbox/path/to/object');
 
-			expect(ref.URIPath).toEqual('/b/sandbox/o/path%2Fto%2Fobject');
+			expect(ref.URIPath).toEqual('b/sandbox/o/path%2Fto%2Fobject');
 		});
 	});
 
