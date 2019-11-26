@@ -1,4 +1,4 @@
-# Firebase storage lite(WIP)
+# Firebase storage lite
 
 The Official Firebase SDKs for Javascript are too big and can make it very hard for developers to achieve standard loading times, and if you are like me and strive to provide the best performance for you users, its impossible to provide good loading times for smartphones over 3G networks due to its big size and over complicated code.
 
