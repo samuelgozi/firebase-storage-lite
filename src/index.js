@@ -57,7 +57,7 @@ export default class Reference {
 				// If the request failed due to outdated auth credentials,
 				// and authentication was used to make the request, then try to
 				// refresh the credentials and then remake the request.
-				if (shouldAuthorize && error === 'Missing or invalid authentication.') {
+				if (shouldAuthorize && response.status === 403) {
 					await this.auth.refreshIdToken();
 					return this.fetch(request);
 				}
