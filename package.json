@@ -1,6 +1,6 @@
 {
 	"name": "firebase-storage-lite",
-	"version": "0.2.3",
+	"version": "0.2.4",
 	"description": "alternative firebase storage JS library",
 	"main": "src/index.js",
 	"author": "Samuel Elgozi <samu.elgozi@gmail.com>",

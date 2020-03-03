@@ -37,7 +37,7 @@ describe('UploadTask', () => {
 			await uploadTask.start();
 
 			// Get the request object made by fetch.
-			const request = fetch.mock.calls[0][0];
+			const request = new Request(...fetch.mock.calls[0]);
 
 			expect(request.headers.get('X-Goog-Upload-Protocol')).toEqual('resumable');
 		});
@@ -59,8 +59,7 @@ describe('UploadTask', () => {
 			await uploadTask.start();
 
 			// Get the request object made by fetch.
-			const request = fetch.mock.calls[0][0];
-			const headers = request.headers;
+			const headers = new Request(...fetch.mock.calls[0]).headers;
 
 			expect(headers.get('Content-type')).toEqual('application/json; charset=utf-8');
 			expect(headers.get('X-Goog-Upload-Protocol')).toEqual('resumable');

@@ -40,33 +40,9 @@ export default class Reference {
 	 * @param {Request|Object|string} resource the resource to send the request to, or an options object.
 	 * @param {Object} init an options object.
 	 */
-	fetch(resource, init) {
-		const request = resource instanceof Request ? resource : new Request(resource, init);
-		const shouldAuthorize = this.auth && 'authorizeRequest' in this.auth;
-
-		if (shouldAuthorize) {
-			this.auth.authorizeRequest(request);
-		}
-
-		return fetch(request.clone()).then(async response => {
-			if (!response.ok) {
-				const error = response.headers.get('content-type').includes('application/json')
-					? (await response.json()).error.message
-					: await response.text();
-
-				// If the request failed due to outdated auth credentials,
-				// and authentication was used to make the request, then try to
-				// refresh the credentials and then remake the request.
-				if (shouldAuthorize && response.status === 403) {
-					await this.auth.refreshIdToken();
-					return this.fetch(request);
-				}
-
-				throw error;
-			}
-
-			return response;
-		});
+	fetch() {
+		if (this.auth && this.auth.authorizedRequest) return this.auth.authorizedRequest(...arguments);
+		return fetch(...arguments);
 	}
 
 	/**
