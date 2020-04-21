@@ -40,8 +40,8 @@ yarn add firebase-storage-lite
 ### Instantiate a reference.
 
 ```javascript
-import Reference from 'firestore-storage-lite';
-import config from 'firestoreConfig.js';
+import Reference from 'firebase-storage-lite';
+import config from 'firebaseConfig.js';
 
 // Create a reference to a bucket or a file.
 // You can just pass the `storageBucket` prop from the `firebaseConfig`,
