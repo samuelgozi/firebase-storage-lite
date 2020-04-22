@@ -117,6 +117,8 @@ An instance of `Reference` pointing to the provided child.
 ## Reference(instance).**put()**
 
 Uploads a blob to the referenced object.
+Returns a [`UploadTask`](#uploadtaskinstance) instance that you can use to get progress, or use as promise.
+Please look at the reference for [`UploadTask`](#uploadtaskinstance) for examples.
 
 ### Arguments
 
@@ -181,14 +183,47 @@ A `Promise` that evaluates to a download URL for this object.
 
 ## UploadTask(instance)
 
-An object that represents an upload task.
-Unlike the name, the API is not the same as Firebases one.
+This object is Promise like, meaning that he has `then`, `catch` and `finally`, and is also a a async iterator.
+So you can iterate over it to get progress updates.
 
-**Currently there is only one method that you should use in your code, and its the one documented here. In the future another one will be added to attach event listeners for upload progress**
+Example of using as a promise:
 
-## UploadTask(instance).**start()**
+```js
+const upload = ref.put(blob); // returns an instance of UploadTask.
 
-Start the Upload process.
+// Will log the metadata when the upload is finished.
+upload.then(meta => {
+	console.log(meta);
+});
+
+// Handle errors.
+upload.catch(e => {
+	console.error(meta);
+});
+
+// Will be run when the promise resolves.
+upload.finally(() => {
+	console.log('done or failed');
+});
+```
+
+Using as an async iterator:
+
+```js
+for await (const { offset, total } of ref.put(blob)) {
+	console.log((offset / total) * 100);
+}
+
+// Will log percentage
+// 0
+// 12
+// 24
+// 36
+// 48
+// ... and so on.
+```
+
+You can also use it for both at a time.
 
 ### Returns
 
