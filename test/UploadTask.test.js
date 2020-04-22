@@ -4,79 +4,74 @@ const { MockBlob, mockResumableResponses } = require('./tests-helpers');
 
 const ref = new Reference('gs://sandbox/some/object/path');
 
+beforeEach(() => {
+	fetch.resetMocks();
+});
+
 describe('UploadTask', () => {
-	describe('Start', () => {
-		beforeEach(() => {
-			fetch.resetMocks();
-		});
-
-		test('Uploads using "simple upload" for files smaller than 5MB', async () => {
-			// Mock the fetch response.
-			fetch.mockResponse(JSON.stringify({ all: 'good' }));
-
-			const blob = new MockBlob(4999999, 'some type');
-			const uploadTask = new UploadTask(ref, blob);
-
-			// Run the start function.
-			await uploadTask.start();
-
-			// Get the request object made by fetch.
-			const request = fetch.mock.calls[0][0];
-
-			expect(request.headers.get('X-Goog-Upload-Protocol')).toEqual('multipart');
-		});
-
-		test('Uploads using "resumable upload" for files larger than 5MB', async () => {
-			const blob = new MockBlob(5000001, 'someType');
-			const uploadTask = new UploadTask(ref, blob);
-
-			// Mock all fetch responses for the resumable upload requests
+	describe('Promise unctionality', () => {
+		test('Has promise methods', () => {
+			const blob = new MockBlob(200, 'someType');
 			mockResumableResponses(blob);
+			const task = new UploadTask(ref, blob);
 
-			// Run the start function.
-			await uploadTask.start();
+			expect(typeof task.then).toEqual('function');
+			expect(typeof task.catch).toEqual('function');
+			expect(typeof task.finally).toEqual('function');
 
-			// Get the request object made by fetch.
-			const request = new Request(...fetch.mock.calls[0]);
+			return task;
+		});
 
-			expect(request.headers.get('X-Goog-Upload-Protocol')).toEqual('resumable');
+		test('Passes promise listeners to original promise', async () => {
+			const blob = new MockBlob(200, 'someType');
+			mockResumableResponses(blob);
+			const task = new UploadTask(ref, blob);
+			await task;
+
+			const t = jest.fn(() => {});
+			const c = jest.fn(() => {});
+			const f = jest.fn(() => {});
+
+			task._p.then = t;
+			task._p.catch = c;
+			task._p.finally = f;
+
+			task.then(1, 2, 3);
+			task.catch(1, 2, 3);
+			task.finally(1, 2, 3);
+
+			expect(t.mock.calls.length).toEqual(1);
+			expect(c.mock.calls.length).toEqual(1);
+			expect(f.mock.calls.length).toEqual(1);
 		});
 	});
 
 	describe('Resumable upload', () => {
-		beforeEach(() => {
-			fetch.resetMocks();
-		});
-
 		test('Requests resumable session with correct headers', async () => {
 			const blob = new MockBlob(5000000, 'someType');
-			const uploadTask = new UploadTask(ref, blob);
-
 			// Mock all fetch responses for the resumable upload requests.
 			mockResumableResponses(blob);
 
-			// Run the start function.
-			await uploadTask.start();
+			await new UploadTask(ref, blob);
 
 			// Get the request object made by fetch.
-			const headers = new Request(...fetch.mock.calls[0]).headers;
+			const headers = fetch.mock.calls[0][1].headers;
 
-			expect(headers.get('Content-type')).toEqual('application/json; charset=utf-8');
-			expect(headers.get('X-Goog-Upload-Protocol')).toEqual('resumable');
-			expect(headers.get('X-Goog-Upload-Command')).toEqual('start');
-			expect(headers.get('X-Goog-Upload-Header-Content-Length')).toEqual(String(blob.size));
-			expect(headers.get('X-Goog-Upload-Header-Content-Type')).toEqual(blob.type);
+			expect(headers['Content-Type']).toEqual(
+				'application/json; charset=utf-8'
+			);
+			expect(headers['X-Goog-Upload-Protocol']).toEqual('resumable');
+			expect(headers['X-Goog-Upload-Command']).toEqual('start');
+			expect(headers['X-Goog-Upload-Header-Content-Length']).toEqual(blob.size);
+			expect(headers['X-Goog-Upload-Header-Content-Type']).toEqual(blob.type);
 		});
 
 		test('Uploads chunks with the right granularity', async () => {
 			const blob = new MockBlob(5000000, 'someType');
-			const uploadTask = new UploadTask(ref, blob);
-
 			// Mock all fetch responses for the resumable upload requests.
 			mockResumableResponses(blob);
 
-			// Run the start function.
-			await uploadTask.start();
+			await new UploadTask(ref, blob);
 
 			const expectedRequests = Math.ceil(blob.size / 262144) + 1;
 			expect(fetch.mock.calls.length).toEqual(expectedRequests);
@@ -84,26 +79,45 @@ describe('UploadTask', () => {
 
 		test('Requests are made with the right headers', async () => {
 			const blob = new MockBlob(5000000, 'someType');
-			const uploadTask = new UploadTask(ref, blob);
-
 			// Mock all fetch responses for the resumable upload requests.
 			// And save the list of the expected headers for all requests.
-			const expectedRequestsHeaders = mockResumableResponses(blob);
-
-			// Run the start function.
-			await uploadTask.start();
+			const expectedHeaders = mockResumableResponses(blob);
+			await new UploadTask(ref, blob);
 
 			// Loop through all the requests and make sure they stick to
 			// the requested granularity.
 			for (let i = 0; i < fetch.mock.calls.length; i++) {
 				if (i === 0) continue; // Skip over the first request
 
-				const request = fetch.mock.calls[i][0];
-				const expectedOffset = expectedRequestsHeaders[i]['X-Goog-Upload-Offset'];
-				const expectedCommand = expectedRequestsHeaders[i]['X-Goog-Upload-Command'];
-				expect(request.headers.get('X-Goog-Upload-Offset')).toEqual(expectedOffset);
-				expect(request.headers.get('X-Goog-Upload-Command')).toEqual(expectedCommand);
+				const request = fetch.mock.calls[i][1];
+				const expectedOffset = expectedHeaders[i]['X-Goog-Upload-Offset'];
+				const expectedCommand = expectedHeaders[i]['X-Goog-Upload-Command'];
+				expect(request.headers['X-Goog-Upload-Offset']).toEqual(expectedOffset);
+				expect(request.headers['X-Goog-Upload-Command']).toEqual(
+					expectedCommand
+				);
 			}
+		});
+	});
+
+	describe('Async iterator', () => {
+		test('Iterates over all of the requests', async () => {
+			const blob = new MockBlob(5000000, 'someType');
+			// Mock all fetch responses for the resumable upload requests.
+			// And save the list of the expected headers for all requests.
+			const expected = mockResumableResponses(blob)
+				.map(v => {
+					return { offset: v['X-Goog-Upload-Offset'], total: blob.size };
+				})
+				.slice(1);
+
+			const allItems = [];
+
+			for await (let p of new UploadTask(ref, blob)) {
+				allItems.push(p);
+			}
+
+			expect(allItems).toEqual(expected);
 		});
 	});
 });

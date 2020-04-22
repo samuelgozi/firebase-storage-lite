@@ -54,7 +54,7 @@ export function mockResumableResponses(blob, granularity = 262144) {
 		});
 
 		expectedRequestsHeaders.push({
-			'X-Goog-Upload-Offset': String(offset),
+			'X-Goog-Upload-Offset': offset,
 			'X-Goog-Upload-Command': isLastChunk ? 'upload, finalize' : 'upload'
 		});
 	}
