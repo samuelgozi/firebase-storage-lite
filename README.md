@@ -8,7 +8,7 @@ I'm currently working on libraries for Firestore, Auth and Storage(this one).
 The main goal of these libraries is to be as lean as possible, and provide close to full functionality, but if it comes at the cost of performance or size, I will most likely choose to stick to lower level functionality that you will need to extend if you need more.
 One example for that will be IE11 and browsers that don't support ES5. I wont try to support them because they require heavy pollyfils, and are dying anyways.
 
-## Whats the difference between this and the official SKD?
+## Whats the difference between this and the official SDK?
 
 The official Storage SDK weights about 11.7KB(minified + gzipped), but if you want to use it you have to also use its companion `@firebase/app` which weights about 9KB(minified + gzipped). Together they add up to about **20.7KB**(minified + gzipped).
 
